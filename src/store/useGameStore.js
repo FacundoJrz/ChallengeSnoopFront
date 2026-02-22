@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import * as signalR from '@microsoft/signalr';
 
 /**
@@ -7,8 +8,9 @@ import * as signalR from '@microsoft/signalr';
  * - Estado del juego (matchId, tablero, turno, oponente)
  * - Conexión y eventos de SignalR
  */
-export const useGameStore = create((set, get) => ({
-  // ===== SESIÓN =====
+export const useGameStore = create(
+  persist(
+    (set, get) => ({  // ===== SESIÓN =====
   user: null,
   token: null,
 
@@ -53,70 +55,78 @@ export const useGameStore = create((set, get) => ({
     });
   },
 
-  /**
+/**
    * Conectar al hub de SignalR
-   * Se ejecuta después de obtener el JWT
    */
   connectToHub: async () => {
-    const { token } = get();
-    if (!token) {
-      console.error('No hay token para conectar al hub');
-      return;
-    }
+      const { token } = get();
+      if (!token) {
+        console.error('No hay token para conectar al hub');
+        return;
+      }
 
-    try {
-      const hubConnection = new signalR.HubConnectionBuilder()
-        .withUrl(
-          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/gamehub`,
-          {
-            accessTokenFactory: () => token
-          }
-        )
-        .withAutomaticReconnect()
-        .build();
+      try {
+        const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+        
+        const hubConnection = new signalR.HubConnectionBuilder()
+          .withUrl(`${backendUrl}/gamehub?access_token=${token}`)
+          .withAutomaticReconnect()
+          .build();
 
-      // Evento: Partida iniciada
-      hubConnection.on('GameStarted', (data) => {
-        console.log('GameStarted event received:', data);
-        set({
-          matchId: data.matchId,
-          board: Array(9).fill(null),
-          currentTurn: data.currentTurn,
-          playerSymbol: data.yourSymbol,
-          opponent: data.opponent,
-          gameStatus: 'playing',
-          winner: null
+        // 1. Escuchar cuando encontramos rival
+        hubConnection.on('GameStarted', (data) => {
+          set({
+            matchId: data.matchId,
+            board: Array(9).fill(null),
+            currentTurn: 'X', // Siempre empieza la X
+            playerSymbol: 'X', // Dato temporal
+            gameStatus: 'playing',
+            winner: null
+          });
         });
-      });
 
-      // Evento: Jugada realizada
-      hubConnection.on('MoveMade', (data) => {
-        console.log('MoveMade event received:', data);
-        const { board } = get();
-        const newBoard = [...board];
-        newBoard[data.position] = data.symbol;
-        set({
-          board: newBoard,
-          currentTurn: data.nextTurn
+        // 2. Escuchar cuando alguien hace un movimiento
+        hubConnection.on('MoveMade', (data) => {
+          console.log('MoveMade event received:', data);
+          const { board } = get();
+          const newBoard = [...board];
+          
+          // Convertimos fila/columna devuelta por C# al índice plano de React
+          const index = (data.row * 3) + data.col; 
+          
+          // TRUCO: Deducimos si es X o O contando los movimientos actuales
+          const movesCount = newBoard.filter(c => c !== null).length;
+          const playedSymbol = movesCount % 2 === 0 ? 'X' : 'O';
+
+          newBoard[index] = playedSymbol;
+          
+          set({
+            board: newBoard,
+            currentTurn: playedSymbol === 'X' ? 'O' : 'X' // Pasamos el turno al siguiente
+          });
         });
-      });
 
-      // Evento: Partida finalizada
-      hubConnection.on('GameOver', (data) => {
-        console.log('GameOver event received:', data);
-        set({
-          gameStatus: 'finished',
-          winner: data.winner
+        // 3. Escuchar cuando termina la partida
+        hubConnection.on('GameOver', (data) => {
+          console.log('GameOver event received:', data);
+          set({
+            gameStatus: 'finished',
+            winner: data.winnerId
+          });
         });
-      });
 
-      await hubConnection.start();
-      set({ hubConnection, isConnected: true });
-      console.log('SignalR connection established');
-    } catch (error) {
-      console.error('Error connecting to SignalR hub:', error);
-    }
-  },
+        // 4. (Opcional) Escuchar cuando entras a la sala de espera
+        hubConnection.on('WaitingForOpponent', (msg) => {
+          console.log(msg);
+        });
+
+        await hubConnection.start();
+        set({ hubConnection, isConnected: true });
+        console.log('SignalR connection established');
+      } catch (error) {
+        console.error('Error connecting to SignalR hub:', error);
+      }
+    },
 
   /**
    * Desconectar del hub de SignalR
@@ -132,16 +142,22 @@ export const useGameStore = create((set, get) => ({
   /**
    * Enviar una jugada al servidor mediante SignalR
    */
-  makeMove: (position) => {
-    const { hubConnection, currentTurn, playerSymbol } = get();
-    if (!hubConnection || currentTurn !== playerSymbol) {
-      console.error('No puedes hacer una jugada en este momento');
-      return;
-    }
-    hubConnection.invoke('MakeMove', {
-      position,
-      symbol: playerSymbol
-    }).catch(err => console.error('Error making move:', err));
+  makeMove: (index) => {
+    const { hubConnection, currentTurn, playerSymbol, matchId } = get();
+    
+    // (Descomenta esta validación cuando implementes los turnos)
+    // if (!hubConnection || currentTurn !== playerSymbol) {
+    //  console.error('No puedes hacer una jugada en este momento');
+    //  return;
+    // }
+
+    // Convertimos el índice plano de React (0-8) a fila (0-2) y columna (0-2)
+    const row = Math.floor(index / 3);
+    const col = index % 3;
+
+    // Llamamos a MakeMove en C#
+    hubConnection.invoke('MakeMove', matchId, row, col)
+      .catch(err => console.error('Error making move:', err));
   },
 
   /**
@@ -153,6 +169,7 @@ export const useGameStore = create((set, get) => ({
       console.error('No connection to hub');
       return;
     }
+    
     set({ gameStatus: 'waiting' });
     hubConnection.invoke('FindMatch').catch(err => console.error('Error finding match:', err));
   },
@@ -163,4 +180,14 @@ export const useGameStore = create((set, get) => ({
   setStats: (stats) => {
     set({ stats });
   }
-}));
+}),
+    {
+      name: 'tateti-auth-storage', // El nombre de la key en el localStorage
+      // 3. ¡LA MAGIA!: Le decimos a Zustand que SOLO guarde el user y el token
+      partialize: (state) => ({ 
+        user: state.user, 
+        token: state.token 
+      }),
+    }
+  )
+);
