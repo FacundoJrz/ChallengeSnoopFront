@@ -68,65 +68,70 @@ function Board() {
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ py: 4 }}>
-        {/* Información del juego */}
-        <Paper elevation={2} sx={{ p: 2, mb: 3, textAlign: 'center' }}>
-          <Typography variant="h5" gutterBottom>
-            Match ID: {matchId}
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 4 }}>
+      <Paper elevation={3} sx={{ p: 3, mb: 4, textAlign: 'center', minWidth: 350 }}>
+        <Typography variant="body2" color="textSecondary" gutterBottom>
+          Match ID: {matchId}
+        </Typography>
+        <Typography variant="h6">
+          You are: <strong style={{ color: '#1976d2' }}>{playerSymbol || 'X'}</strong>
+        </Typography>
+        <Typography variant="h6">
+          Opponent: <strong>{opponent || 'Player 2'}</strong>
+        </Typography>
+
+        {/* Mensaje dinámico de Turno o Fin de juego */}
+        {gameStatus === 'finished' ? (
+          <Typography variant="h5" sx={{ mt: 2, fontWeight: 'bold', color: '#ff9800' }}>
+            {winner ? `Game Over! Winner: ${winner}` : "Game Over! It's a Draw!"}
           </Typography>
-          <Typography variant="body1" gutterBottom>
-            You are: <strong>{playerSymbol}</strong>
-          </Typography>
-          <Typography variant="body1" gutterBottom>
-            Opponent: <strong>{opponent?.name || 'Unknown'}</strong>
-          </Typography>
+        ) : (
           <Typography
-            variant="h6"
+            variant="h5"
             sx={{
               mt: 2,
-              color: isMyTurn ? '#4caf50' : '#1976d2',
-              fontWeight: 'bold'
+              fontWeight: 'bold',
+              color: currentTurn === playerSymbol ? '#2e7d32' : '#d32f2f'
             }}
           >
-            {gameFinished ? (
-              <>
-                Game Over {' '}
-                {winner === 'Draw' ? (
-                  <span style={{ color: '#ff9800' }}>- Draw</span>
-                ) : winner === playerSymbol ? (
-                  <span style={{ color: '#4caf50' }}>- You Won!</span>
-                ) : (
-                  <span style={{ color: '#f44336' }}>- You Lost</span>
-                )}
-              </>
-            ) : isMyTurn ? (
-              'Your Turn 🎮'
-            ) : (
-              `${opponent?.name || 'Opponent'}'s Turn ⏳`
-            )}
+            {currentTurn === playerSymbol ? 'Your Turn 🎮' : "Opponent's Turn ⏳"}
           </Typography>
-        </Paper>
-
-        {/* Tablero 3x3 */}
-        <Grid container spacing={1} sx={{ mb: 3 }}>
-          {board.map((_, index) => (
-            <Grid item xs={4} key={index}>
-              {renderCell(index)}
-            </Grid>
-          ))}
-        </Grid>
-
-        {/* Información adicional */}
-        {gameFinished && (
-          <Paper elevation={1} sx={{ p: 2, backgroundColor: '#f5f5f5', textAlign: 'center' }}>
-            <Typography variant="body2" color="textSecondary">
-              Return to dashboard to play again
-            </Typography>
-          </Paper>
         )}
+      </Paper>
+
+      {/* El Tablero: Corregido para que no se deforme */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 100px)', // 3 columnas fijas de 100px
+          gridTemplateRows: 'repeat(3, 100px)',    // 3 filas fijas de 100px
+          gap: 1.5,
+          margin: 'auto'
+        }}
+      >
+        {board.map((cell, index) => (
+          <Button
+            key={index}
+            variant="outlined"
+            onClick={() => makeMove(index)}
+            // Se bloquea si ya tiene símbolo O si el juego ya terminó
+            disabled={cell !== null || gameStatus === 'finished'} 
+            sx={{
+              fontSize: '3rem', // Tamaño de fuente un poco más pequeño para que entre bien
+              fontWeight: 'bold',
+              height: '100%',
+              width: '100%',
+              padding: 0, // Evita que el padding interno empuje la caja
+              color: cell === 'X' ? '#1976d2' : '#d32f2f',
+              backgroundColor: '#f8f9fa',
+              '&:hover': { backgroundColor: '#e9ecef' }
+            }}
+          >
+            {cell}
+          </Button>
+        ))}
       </Box>
-    </Container>
+    </Box>
   );
 }
 

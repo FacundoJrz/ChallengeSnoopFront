@@ -13,16 +13,20 @@ function Login() {
   const connectToHub = useGameStore((state) => state.connectToHub);
 
   const handleLoginSuccess = async (credentialResponse) => {
-    try {
+  try {
       // Enviar el token de Google al backend
       const response = await api.post('/api/Auth/google', {
         token: credentialResponse.credential
       });
 
-      const { user, jwtToken } = response.data;
+      // ¡CORRECCIÓN AQUÍ! Leemos los datos tal cual los manda tu backend en C#
+      const { email, username, token } = response.data;
+
+      // Armamos el objeto user para Zustand
+      const user = { email, username };
 
       // Guardar usuario y JWT en el store
-      setAuth(user, jwtToken);
+      setAuth(user, token);
 
       // Conectar al hub de SignalR después de obtener el JWT
       await connectToHub();

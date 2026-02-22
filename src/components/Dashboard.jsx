@@ -118,7 +118,7 @@ function Dashboard() {
                   Total Wins
                 </Typography>
                 <Typography variant="h5">
-                  {stats.totalWins || 0}
+                  {stats.wins || 0}
                 </Typography>
               </CardContent>
             </Card>
@@ -130,7 +130,7 @@ function Dashboard() {
                   Total Losses
                 </Typography>
                 <Typography variant="h5">
-                  {stats.totalLosses || 0}
+                  {stats.losses || 0}
                 </Typography>
               </CardContent>
             </Card>
@@ -142,7 +142,7 @@ function Dashboard() {
                   Total Draws
                 </Typography>
                 <Typography variant="h5">
-                  {stats.totalDraws || 0}
+                  {stats.draws || 0}
                 </Typography>
               </CardContent>
             </Card>
@@ -151,10 +151,10 @@ function Dashboard() {
             <Card>
               <CardContent>
                 <Typography color="textSecondary" gutterBottom>
-                  Win Rate
+                  Total Games
                 </Typography>
                 <Typography variant="h5">
-                  {stats.winRate ? (stats.winRate * 100).toFixed(1) : 0}%
+                  {stats.matchHistory ? stats.matchHistory.length : 0}
                 </Typography>
               </CardContent>
             </Card>
@@ -171,10 +171,7 @@ function Dashboard() {
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                   <TableCell>Date</TableCell>
-                  <TableCell>Opponent</TableCell>
-                  <TableCell>Your Symbol</TableCell>
                   <TableCell>Result</TableCell>
-                  <TableCell>Duration</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -182,10 +179,9 @@ function Dashboard() {
                   stats.matchHistory.map((match, index) => (
                     <TableRow key={index}>
                       <TableCell>
-                        {new Date(match.date).toLocaleDateString()}
+                        {new Date(stats.matchHistory[index].date).toLocaleString().split(',')[0]}
                       </TableCell>
-                      <TableCell>{match.opponentName}</TableCell>
-                      <TableCell>{match.yourSymbol}</TableCell>
+                      
                       <TableCell>
                         <Typography
                           sx={{
@@ -201,7 +197,6 @@ function Dashboard() {
                           {match.result}
                         </Typography>
                       </TableCell>
-                      <TableCell>{match.durationSeconds}s</TableCell>
                     </TableRow>
                   ))
                 ) : (
